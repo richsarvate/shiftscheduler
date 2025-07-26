@@ -259,7 +259,6 @@ This project is licensed under the MIT License.
 ---
 
 <div align="center">
-  <p>Built with ❤️ for comedy scheduling</p>
   <p>
     <a href="https://shiftscheduler.vercel.app">🌐 Live Demo</a> •
     <a href="https://github.com/richsarvate/shiftscheduler/issues">🐛 Report Bug</a> •
