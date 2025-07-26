@@ -1,103 +1,226 @@
-import Image from "next/image";
+'use client';
+
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { ShowAssignmentTable } from '@/components/ShowAssignmentTable';
+import { ComedianStatsSidebar } from '../components/ComedianStatsSidebar';
+
+// Helper function to convert names to title case
+function toTitleCase(str: string): string {
+  if (!str) return str;
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+    .trim();
+}
+
+function extractMonths(data: string[][]): string[] {
+  const header = data[0];
+  const stowawayCol = header.find(h => h && h.includes('Stowaway'));
+  const citizenCol = header.find(h => h && h.includes('Citizen'));
+  const stowawayIdx = header.indexOf(stowawayCol || '');
+  const citizenIdx = header.indexOf(citizenCol || '');
+
+  const dates: string[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const entries = [data[i][stowawayIdx] || '', data[i][citizenIdx] || ''];
+    entries.forEach(entry => {
+      if (entry) {
+        entry.split(',').forEach(dateStr => {
+          const trimmed = dateStr.trim();
+          const dateMatch = trimmed.match(/\w+\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\s+\d{4}/);
+          if (dateMatch) {
+            const monthDayYear = dateMatch[0].replace(/^\w+\s+/, '');
+            const date = new Date(monthDayYear);
+            if (!isNaN(date.getTime())) {
+              const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+              dates.push(monthYear);
+            }
+          }
+        });
+      }
+    });
+  }
+
+  return [...new Set(dates)].sort();
+}
+
+// Function to normalize data with title case names
+function normalizeData(data: string[][]): string[][] {
+  if (!data || data.length === 0) return data;
+  
+  const header = data[0];
+  const nameIdx = header.findIndex(h => h.includes('Your name'));
+  
+  if (nameIdx === -1) return data;
+  
+  return data.map((row, index) => {
+    if (index === 0) return row; // Skip header row
+    
+    return row.map((cell, cellIndex) => {
+      if (cellIndex === nameIdx && cell) {
+        return toTitleCase(cell);
+      }
+      return cell;
+    });
+  });
+}
+
+// Local Storage keys
+const STORAGE_KEYS = {
+  ASSIGNMENTS: 'shift-scheduler-assignments',
+  SELECTED_MONTH: 'shift-scheduler-selected-month'
+};
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [availData, setAvailData] = useState<string[][]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [assignments, setAssignments] = useState<Record<string, { host: string; door: string[] }>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Load saved data from localStorage on component mount
+  useEffect(() => {
+    try {
+      const savedAssignments = localStorage.getItem(STORAGE_KEYS.ASSIGNMENTS);
+      const savedSelectedMonth = localStorage.getItem(STORAGE_KEYS.SELECTED_MONTH);
+      
+      if (savedAssignments) {
+        setAssignments(JSON.parse(savedAssignments));
+      }
+      
+      if (savedSelectedMonth) {
+        setSelectedMonth(savedSelectedMonth);
+      }
+    } catch (error) {
+      console.error('Error loading saved data:', error);
+    }
+  }, []);
+
+  // Save assignments to localStorage whenever they change
+  useEffect(() => {
+    if (!isLoading && Object.keys(assignments).length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(assignments));
+      } catch (error) {
+        console.error('Error saving assignments:', error);
+      }
+    }
+  }, [assignments, isLoading]);
+
+  // Save selected month to localStorage whenever it changes
+  useEffect(() => {
+    if (!isLoading && selectedMonth) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.SELECTED_MONTH, selectedMonth);
+      } catch (error) {
+        console.error('Error saving selected month:', error);
+      }
+    }
+  }, [selectedMonth, isLoading]);
+
+  // Fetch data from API
+  useEffect(() => {
+    fetch('/api/availabilities')
+      .then(res => res.json())
+      .then(data => {
+        // Normalize the data to ensure consistent name formatting
+        const normalizedData = normalizeData(data);
+        setAvailData(normalizedData);
+        const months = extractMonths(normalizedData);
+        setAvailableMonths(months);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching data:', error);
+        setIsLoading(false);
+      });
+  }, []);
+
+  // Handle month selection change
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                🎭 Shift Scheduler
+              </h1>
+              <p className="text-slate-600 mt-1">Manage comedy show assignments with ease</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <label className="text-sm font-medium text-slate-700">📅 Select Month:</label>
+              <select
+                className="bg-white border border-slate-300 rounded-lg px-4 py-2 pr-8 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-slate-900 min-w-[180px]"
+                value={selectedMonth}
+                onChange={e => handleMonthChange(e.target.value)}
+              >
+                <option value="" className="text-slate-500">-- Select Month --</option>
+                {availableMonths.map(month => (
+                  <option key={month} value={month} className="text-slate-900">{month}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/60 overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  📋 Show Assignments
+                  {selectedMonth && (
+                    <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full text-slate-100">
+                      {selectedMonth}
+                    </span>
+                  )}
+                </h2>
+              </div>
+              <div className="p-6">
+                <ShowAssignmentTable
+                  availData={availData}
+                  selectedMonth={selectedMonth}
+                  assignments={assignments}
+                  setAssignments={setAssignments}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/60 overflow-hidden sticky top-32">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  📊 Stats
+                </h2>
+              </div>
+              <div className="p-6">
+                <ComedianStatsSidebar 
+                  availData={availData}
+                  assignments={assignments}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-16 bg-slate-900 text-slate-300">
+        <div className="max-w-7xl mx-auto px-6 py-8 text-center text-sm">
+          Built with ❤️ for comedy scheduling • Powered by Next.js & Tailwind CSS
+        </div>
+      </div>
     </div>
   );
 }
