@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';  // Remove Dispatch, SetStateAction
 import { ShowAssignmentTable } from '@/components/ShowAssignmentTable';
 import { ComedianStatsSidebar } from '../components/ComedianStatsSidebar';
 

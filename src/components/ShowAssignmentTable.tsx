@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Dispatch, SetStateAction } from 'react';
+import { useMemo, Dispatch, SetStateAction } from 'react'; // Remove useState
 
 type Assignment = {
   host: string;
@@ -38,7 +38,7 @@ export function ShowAssignmentTable({
     const dates = new Set<string>();
     const shows: Show[] = [];
     for (const row of rows) {
-      const name = row[nameIdx]?.trim();
+      // Remove this line: const name = row[nameIndex]?.trim();
       const stowawayDates = (row[stowawayIdx] || '').split(',').map(d => d.trim());
       const citizenDates = (row[citizenIdx] || '').split(',').map(d => d.trim());
       for (const d of stowawayDates) {
@@ -61,7 +61,7 @@ export function ShowAssignmentTable({
       }
     }
     return shows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [rows, selectedMonth]);
+  }, [rows, selectedMonth, citizenIdx, stowawayIdx]); // Add missing dependencies
 
   const people = rows.map(row => ({
     name: row[nameIdx]?.trim(),

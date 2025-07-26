@@ -18,9 +18,9 @@ export function ComedianStatsSidebar({
   assignments,
   selectedMonth
 }: ComedianStatsSidebarProps) {
-  const { unassignedPeople, understaffedShows, allShows, comedianAssignments } = useMemo(() => {
+  const { unassignedPeople, understaffedShows, comedianAssignments } = useMemo(() => {
     if (!availData || availData.length === 0 || !selectedMonth) {
-      return { unassignedPeople: [], understaffedShows: [], allShows: [], comedianAssignments: [] };
+      return { unassignedPeople: [], understaffedShows: [], comedianAssignments: [] };
     }
 
     const header = availData[0] || [];
@@ -169,7 +169,6 @@ export function ComedianStatsSidebar({
     return { 
       unassignedPeople: unassigned, 
       understaffedShows: understaffed,
-      allShows: sortedShows,
       comedianAssignments: comedianAssignmentsList
     };
   }, [availData, assignments, selectedMonth]);
@@ -189,7 +188,7 @@ export function ComedianStatsSidebar({
           </h3>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <ul className="space-y-3">
-              {comedianAssignments.map(({ name, shifts, hostCount, doorCount, totalCount }) => (
+              {comedianAssignments.map(({ name, shifts, hostCount, totalCount }) => (
                 <li key={name} className="text-sm">
                   <div className="font-medium text-blue-800 mb-1">
                     {name} - {totalCount} shift{totalCount !== 1 ? 's' : ''}{hostCount > 0 ? ` (${hostCount} hosting)` : ''}
@@ -238,7 +237,7 @@ export function ComedianStatsSidebar({
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <ul className="space-y-2">
-                {understaffedShows.map(({ showKey, assignment, missingHost, missingDoor }) => (
+                {understaffedShows.map(({ showKey, missingHost, missingDoor }) => (
                   <li key={showKey} className="text-sm">
                     <div className="font-medium text-red-800 mb-1">
                       {showKey}
